@@ -1,0 +1,8 @@
+numpy
+gym
+torch
+pytorch3d
+torchvision
+PIL
+ruamel.yaml
+tqdm
