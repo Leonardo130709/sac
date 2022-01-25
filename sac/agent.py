@@ -57,11 +57,7 @@ class SACAgent(nn.Module):
         if training:
             action = dist.sample()
         else:
-            action = torch.mean(dist.sample(sample_shape=[1000]), 0)  # only works for normal
-        action = self._exploration(action, training)
-        return action
-
-    def _exploration(self, action, training):
+            action = torch.mean(dist.sample(sample_shape=[1000]), 0)
         return action
 
     @torch.no_grad()
