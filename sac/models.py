@@ -48,13 +48,11 @@ class PointCloudEncoder(nn.Module):
             nn.Conv1d(2 * depth, 4 * depth, 1),
             #nn.BatchNorm1d(4 * depth),
             nn.ReLU(),
-            nn.LayerNorm(4*depth)
         )
 
-        self.mlp = nn.Sequential(
-            nn.Linear(4 * depth, 2 * depth),
-            nn.ReLU(),
-            nn.Linear(2 * depth, depth),
+        self.fc = nn.Sequential(
+            nn.Linear(4*depth, depth),
+            nn.LayerNorm(depth),
             nn.Tanh()
         )
 
@@ -62,7 +60,7 @@ class PointCloudEncoder(nn.Module):
         X = X.transpose(-1, -2)
         X = self.conv(X)
         X = torch.max(X, -1)[0]
-        X = self.mlp(X)
+        X = self.fc(X)
         return X
 
 
@@ -70,7 +68,7 @@ class PointCloudDecoder(nn.Module):
     def __init__(self, out_features, depth, n_points):
         super().__init__()
 
-        self.fc = nn.Linear(depth, n_points * 4 * depth),
+        self.fc = nn.Linear(depth, n_points * 4 * depth)
 
         self.deconv = nn.Sequential(
             nn.Unflatten(1, (4 * depth, n_points)),
@@ -84,6 +82,6 @@ class PointCloudDecoder(nn.Module):
         )
 
     def forward(self, X):
-        X = F.relu(self.fc(X))
+        X = self.fc(X)
         X = self.deconv(X)
         return X.transpose(-1, -2)

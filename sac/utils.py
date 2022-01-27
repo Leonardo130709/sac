@@ -59,6 +59,7 @@ def build_encoder_decoder(configs, obs_shape):
     if configs.encoder == 'MLP':
         encoder.append(nn.Flatten())
         encoder.append(build_mlp([obs_shape[0]] + 3*[configs.hidden] + [emb_dim]))
+        encoder.append(nn.Tanh())
         decoder.append(build_mlp([emb_dim]+3*[configs.hidden]+[obs_shape[0]]))
     elif configs.encoder == 'PointNet':
         encoder.append(PointCloudEncoder(obs_shape[-1], configs.pn_depth))
@@ -66,6 +67,7 @@ def build_encoder_decoder(configs, obs_shape):
     elif configs.encoder == 'PointNetMLP':
         encoder.append(nn.Flatten())
         encoder.append(build_mlp([np.prod(obs_shape)] + 3*[configs.hidden] + [emb_dim]))
+        encoder.append(nn.Tanh())
         decoder.append(build_mlp([emb_dim] + 3*[configs.hidden] + [np.prod(obs_shape)]))
         decoder.append(nn.Unflatten(1, obs_shape))
         configs.encoder = 'PointNet'
@@ -153,9 +155,5 @@ def weight_init(m):
         nn.init.orthogonal_(m.weight.data)
         m.bias.data.fill_(0.0)
     elif any(map(lambda module: isinstance(m, module), (nn.Conv1d, nn.Conv2d, nn.ConvTranspose1d, nn.ConvTranspose1d))):
-        assert m.weight.size(2) == m.weight.size(3)
-        m.weight.data.fill_(0.0)
         m.bias.data.fill_(0.0)
-        mid = m.weight.size(2) // 2
-        gain = nn.init.calculate_gain('relu')
-        nn.init.orthogonal_(m.weight.data[:, :, mid, mid], gain)
+        nn.init.orthogonal_(m.weight.data)
