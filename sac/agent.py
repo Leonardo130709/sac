@@ -5,7 +5,7 @@ F = nn.functional
 from torch.nn.utils import clip_grad_norm_
 from copy import deepcopy
 from .models import DoubleCritic
-from .utils import soft_update, grads_sum, PseudoTape
+from .utils import soft_update, grads_sum, PseudoTape, weight_init
 from pytorch3d.loss import chamfer_distance
 import numpy as np
 
@@ -29,8 +29,8 @@ class SACAgent(nn.Module):
 
         self.critic = DoubleCritic(obs_emb_dim + action_dim, config.hidden, self.encoder)
         self.target_critic = deepcopy(self.critic)
-        self.alpha = nn.Parameter(torch.tensor(np.log(self.c.alpha), requires_grad=False))
-        self.target_entropy = - np.prod(action_dim)
+        self.alpha = nn.Parameter(torch.tensor(np.log(self.c.alpha)))
+        self.target_entropy = np.prod(action_dim)
         self.compile()
 
         self.requires_grad_(False)
@@ -39,9 +39,9 @@ class SACAgent(nn.Module):
         self.step = 0
 
     def policy(self, obs):
-        obs = F.relu(self.encoder(obs))
+        obs = self.encoder(obs)
         mu, std = self.actor(obs).chunk(2, -1)
-        std = torch.clamp(std, -10, 2)
+        std = torch.clamp(std, -5, 2)
         std = F.softplus(std)
         mu = self.c.mean_scale * torch.tanh(mu / self.c.mean_scale)
         dist = td.Normal(mu, std)
@@ -58,10 +58,6 @@ class SACAgent(nn.Module):
             action = dist.sample()
         else:
             action = torch.mean(dist.sample(sample_shape=[1000]), 0)  # only works for normal
-        action = self._exploration(action, training)
-        return action
-
-    def _exploration(self, action, training):
         return action
 
     @torch.no_grad()
@@ -89,12 +85,12 @@ class SACAgent(nn.Module):
                 clip_grad_norm_(self.actor.parameters(), self.c.actor_grad_max)
             self.actor_optim.step()
 
-        # with PseudoTape([self.alpha]):
-        #     al = self._alpha_loss(obs)
-        #     self.alpha_optim.zero_grad()
-        #     al.backward()
-        #     self.alpha_optim.step()
-        #     self.callback.add_scalar('train/alpha', self.alpha.exp().item(), self.step)
+        with PseudoTape([self.alpha]):
+            al = self._alpha_loss(obs)
+            self.alpha_optim.zero_grad()
+            al.backward()
+            self.alpha_optim.step()
+            self.callback.add_scalar('train/alpha', self.alpha.exp().item(), self.step)
 
         with PseudoTape(self.ae_params):
             ael = self._ae_loss(obs)
@@ -118,7 +114,9 @@ class SACAgent(nn.Module):
         actions = dist.rsample()
         log_prob = dist.log_prob(actions)
         v1, v2 = self.critic(observations, actions)
+        assert v1.shape == v2.shape == log_prob.shape
         loss = torch.minimum(v1, v2) - self.alpha.exp() * log_prob
+        assert loss.shape == log_prob.shape
         return - loss.mean()
 
     def _critic_loss(self, obs, actions, rewards, dones, next_obs):
@@ -150,7 +148,7 @@ class SACAgent(nn.Module):
             dist = self.policy(obs)
             actions = dist.sample()
             log_prob = dist.log_prob(actions)
-        return - self.alpha.exp() * (log_prob + self.target_entropy).mean()
+        return  - self.alpha.exp() * (log_prob - self.target_entropy).mean()
 
     def compile(self):
         self.actor_optim = torch.optim.Adam(self.actor.parameters(), self.c.actor_lr)
@@ -160,3 +158,4 @@ class SACAgent(nn.Module):
                                                   self.c.ae_lr, weight_decay=self.c.ae_l2)
         self.alpha_optim = torch.optim.Adam([self.alpha], self.c.alpha_lr)
         self.to(self.c.device)
+        self.apply(weight_init)

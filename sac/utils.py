@@ -4,6 +4,7 @@ import torch
 import math
 import numpy as np
 from gym.spaces import Box, Discrete
+import plotly.graph_objects as go
 
 
 class PseudoTape:
@@ -44,6 +45,8 @@ def extract_shapes(env):
             shape = space.shape[0]
         elif isinstance(space, Discrete):
             shape = space.n
+        else:
+            raise NotImplementedError
         return shape
     return map(lambda x: extract(x), [env.observation_space, env.action_space])
 
@@ -130,8 +133,6 @@ class PointCloudGenerator:
         return xyz
 
 
-import plotly.graph_objects as go
-
 def draw_pc(pc_arr):
     x = np.array([pc_arr[i][0] for i in range(pc_arr.shape[0])])
     y = np.array([pc_arr[i][1] for i in range(pc_arr.shape[0])])
@@ -146,3 +147,15 @@ def draw_pc(pc_arr):
 
     fig.show()
 
+
+def weight_init(m):
+    if isinstance(m, nn.Linear):
+        nn.init.orthogonal_(m.weight.data)
+        m.bias.data.fill_(0.0)
+    elif any(map(lambda module: isinstance(m, module), (nn.Conv1d, nn.Conv2d, nn.ConvTranspose1d, nn.ConvTranspose1d))):
+        assert m.weight.size(2) == m.weight.size(3)
+        m.weight.data.fill_(0.0)
+        m.bias.data.fill_(0.0)
+        mid = m.weight.size(2) // 2
+        gain = nn.init.calculate_gain('relu')
+        nn.init.orthogonal_(m.weight.data[:, :, mid, mid], gain)

@@ -30,7 +30,7 @@ class DoubleCritic(nn.Module):
         self.Q2 = Critic(input_dim, hidden_dim)
 
     def forward(self, obs, action):
-        obs = F.relu(self.encoder(obs))
+        obs = self.encoder(obs)
         return self.Q1(obs, action), self.Q2(obs, action)
 
 
@@ -48,13 +48,14 @@ class PointCloudEncoder(nn.Module):
             nn.Conv1d(2 * depth, 4 * depth, 1),
             #nn.BatchNorm1d(4 * depth),
             nn.ReLU(),
+            nn.LayerNorm(4*depth)
         )
 
         self.mlp = nn.Sequential(
             nn.Linear(4 * depth, 2 * depth),
             nn.ReLU(),
             nn.Linear(2 * depth, depth),
-            #nn.LayerNorm(depth)
+            nn.Tanh()
         )
 
     def forward(self, X):
@@ -69,13 +70,7 @@ class PointCloudDecoder(nn.Module):
     def __init__(self, out_features, depth, n_points):
         super().__init__()
 
-        self.mlp = nn.Sequential(
-            nn.Linear(depth, 2 * depth),
-            nn.ReLU(),
-            nn.Linear(2 * depth, 4 * depth),
-            nn.ReLU(),
-            nn.Linear(4 * depth, n_points * 4 * depth)
-        )
+        self.fc = nn.Linear(depth, n_points * 4 * depth),
 
         self.deconv = nn.Sequential(
             nn.Unflatten(1, (4 * depth, n_points)),
@@ -89,6 +84,6 @@ class PointCloudDecoder(nn.Module):
         )
 
     def forward(self, X):
-        X = F.relu(self.mlp(X))
+        X = F.relu(self.fc(X))
         X = self.deconv(X)
         return X.transpose(-1, -2)

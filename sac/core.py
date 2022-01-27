@@ -35,14 +35,14 @@ class Config:
     actor_grad_max = None
     critic_grad_max = None
     frames_stack = 3
-    actions_repeat = 6
+    actions_repeat = 2
     # 3 layer with relu 1024 hidden - arxiv.org/abs/1910.01741
 
     # runner
     nenvs = 10
     max_steps = 30
-    n_evals = 10 // nenvs
-    buffer_capacity = 10**6
+    n_evals = 1
+    buffer_capacity = 5 * 10**5
 
     # logger
 
@@ -54,7 +54,7 @@ class Config:
     ae_grad_max = None
     ae_latent_reg = 1e-7
 
-    pn_depth = 32
+    pn_depth = 40
     pn_number = 1000
 
     #train
@@ -77,8 +77,9 @@ class Config:
 
 config = Config()
 
+
 class SAC:
-    def __init__(self, config=config):
+    def __init__(self, config=Config()):
         self.c = config
         self._env = self._make_env()
 
@@ -130,6 +131,8 @@ class SAC:
                     obs, action, reward, done, next_obs = map(lambda tensor: tensor.to(self.c.device), next(dl))
                     self.agent.learn(obs, action, reward, done, next_obs)
 
+                del dl
+
                 if t % eval_freq == 0:
                     score = self.runner.evaluate()[0]
                     logs.append(score)
@@ -151,7 +154,7 @@ class SAC:
         return obs_shape, action_shape, enc_obs_shape
 
     def _make_env(self):
-        env = suite.load(*self.c.task.split('_'), task_kwargs={'random': 0})
+        env = suite.load(*self.c.task.split('_', 1), task_kwargs={'random': 0})
         if self.c.encoder == 'MLP':
             env = dmWrapper(env)
         elif self.c.encoder == 'PointNet':
