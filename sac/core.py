@@ -188,6 +188,7 @@ class SAC:
             self.agent.autoencoder_optim.load_state_dict(chkp['ae_optim'])
             self.agent.requires_grad_(False)
             self.agent.alpha_optim.load_state_dict(chkp['alpha_optim'])
+            self.agent.alpha = chkp['alpha']
         self.runner.interactions_count = chkp['interactions']
 
     def _write_hparams(self):
