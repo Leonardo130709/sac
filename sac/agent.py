@@ -5,7 +5,7 @@ F = nn.functional
 from torch.nn.utils import clip_grad_norm_
 from copy import deepcopy
 from .models import DoubleCritic
-from .utils import soft_update, grads_sum, PseudoTape, weight_init
+from .utils import soft_update, grads_sum, PseudoTape, weight_init, TanhTransform
 from pytorch3d.loss import chamfer_distance
 import numpy as np
 
@@ -45,7 +45,7 @@ class SACAgent(nn.Module):
         std = F.softplus(std)
         mu = self.c.mean_scale * torch.tanh(mu / self.c.mean_scale)
         dist = td.Normal(mu, std)
-        dist = td.TransformedDistribution(dist, td.transforms.TanhTransform())
+        dist = td.TransformedDistribution(dist, TanhTransform())
         return dist
 
     @torch.no_grad()

@@ -5,6 +5,7 @@ import math
 import numpy as np
 from gym.spaces import Box, Discrete
 import plotly.graph_objects as go
+td = torch.distributions
 
 
 class PseudoTape:
@@ -157,3 +158,10 @@ def weight_init(m):
     elif any(map(lambda module: isinstance(m, module), (nn.Conv1d, nn.Conv2d, nn.ConvTranspose1d, nn.ConvTranspose1d))):
         m.bias.data.fill_(0.0)
         nn.init.orthogonal_(m.weight.data)
+
+
+class TanhTransform(td.transforms.TanhTransform):
+    lim = 0.99999997
+    def _inverse(self, y):
+        y = torch.clamp(y, min=-self.lim, max=self.lim)
+        return torch.atanh(y)
