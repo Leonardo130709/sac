@@ -179,7 +179,7 @@ class SAC:
         y.register_class(Config)
         with (self._task_path / 'hyperparams').open() as hp:
             self.c = y.load(hp)
-        self.buffer.load(self._task_path)
+        #self.buffer.load(self._task_path)
         chkp = torch.load(self._task_path / 'checkpoint')
         with torch.no_grad():
             self.agent.load_state_dict(chkp['model'])

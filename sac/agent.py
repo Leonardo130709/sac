@@ -149,7 +149,7 @@ class SACAgent(nn.Module):
             dist = self.policy(obs)
             actions = dist.sample()
             log_prob = dist.log_prob(actions).sum(-1, keepdims=True)
-        return  - self.alpha.exp() * (log_prob - self.target_entropy).mean()
+        return - self.alpha.exp() * (log_prob - self.target_entropy).mean()
 
     def compile(self):
         self.actor_optim = torch.optim.Adam(self.actor.parameters(), self.c.actor_lr)
