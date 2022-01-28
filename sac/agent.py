@@ -112,9 +112,9 @@ class SACAgent(nn.Module):
     def _policy_loss(self, observations):
         dist = self.policy(observations)
         actions = dist.rsample()
-        log_prob = dist.log_prob(actions)
+        log_prob = dist.log_prob(actions).sum(-1, keepdims=True)
         v1, v2 = self.critic(observations, actions)
-        assert v1.shape == v2.shape == log_prob.shape
+        assert v1.shape == v2.shape == log_prob.shape, f"{v1.shape, v2.shape, log_prob.shape}"
         loss = torch.minimum(v1, v2) - self.alpha.exp() * log_prob
         assert loss.shape == log_prob.shape
         return - loss.mean()
@@ -124,9 +124,10 @@ class SACAgent(nn.Module):
             dist = self.policy(next_obs)
             self.callback.add_scalar('train/entropy', dist.base_dist.entropy().mean().item(), self.step)
             next_actions = dist.sample()
-            log_prob = dist.log_prob(next_actions)
+            log_prob = dist.log_prob(next_actions).sum(-1, keepdims=True)
             tv1, tv2 = self.target_critic(next_obs, next_actions)
             target_values = torch.minimum(tv1, tv2) - self.alpha.exp() * log_prob
+            assert tv1.shape == tv2.shape == log_prob.shape == target_values.shape == rewards.shape, f"{tv1.shape, tv2.shape, log_prob.shape}"
             self.callback.add_scalar('train/mean_val', target_values.mean().item(), self.step)
             target_values = rewards + self.c.gamma * (1 - dones) * target_values
 
@@ -147,7 +148,7 @@ class SACAgent(nn.Module):
         with torch.no_grad():
             dist = self.policy(obs)
             actions = dist.sample()
-            log_prob = dist.log_prob(actions)
+            log_prob = dist.log_prob(actions).sum(-1, keepdims=True)
         return  - self.alpha.exp() * (log_prob - self.target_entropy).mean()
 
     def compile(self):

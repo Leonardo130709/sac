@@ -23,14 +23,14 @@ td = torch.distributions
 class Config:
     # agent
     alpha = .1
-    hidden = 256
+    hidden = 512
     mean_scale = 5
     rho_critic = .99
     rho_encoder = .95
     gamma = .99
     actor_lr = 1e-3
     critic_lr = 1e-3
-    alpha_lr = 1e-4
+    alpha_lr = 5e-5
     device = 'cuda'
     actor_grad_max = None
     critic_grad_max = None
