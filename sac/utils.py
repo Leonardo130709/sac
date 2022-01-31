@@ -59,12 +59,12 @@ def build_encoder_decoder(configs, obs_shape):
     nf = configs.frames_stack
     if configs.encoder == 'MLP':
         encoder.append(nn.Flatten())
-        encoder.append(build_mlp([obs_shape[0]] + 3*[configs.hidden] + [emb_dim]))
+        encoder.append(build_mlp([obs_shape[0]] + 1*[configs.hidden] + [emb_dim]))
         encoder.append(nn.Tanh())
-        decoder.append(build_mlp([emb_dim]+3*[configs.hidden]+[obs_shape[0]]))
+        decoder.append(build_mlp([emb_dim]+1*[configs.hidden]+[obs_shape[0]]))
     elif configs.encoder == 'PointNet':
-        encoder.append(PointCloudEncoder(obs_shape[-1], configs.pn_depth))
-        decoder.append(PointCloudDecoder(obs_shape[-1], configs.pn_depth, obs_shape[0]))
+        encoder.append(PointCloudEncoder(obs_shape[-1], configs.pn_depth, configs.pn_layers))
+        decoder.append(PointCloudDecoder(obs_shape[-1], configs.pn_depth, configs.pn_layers, obs_shape[0]))
     elif configs.encoder == 'PointNetMLP':
         encoder.append(nn.Flatten())
         encoder.append(build_mlp([np.prod(obs_shape)] + 3*[configs.hidden] + [emb_dim]))

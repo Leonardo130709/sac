@@ -15,6 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import trange
 import pathlib
 from ruamel.yaml import YAML
+import datetime
 nn = torch.nn
 td = torch.distributions
 #torch.autograd.set_detect_anomaly(True)
@@ -31,7 +32,7 @@ class Config:
     gamma = .99
     actor_lr = 1e-3
     critic_lr = 1e-3
-    alpha_lr = 5e-5
+    alpha_lr = 1e-4
     device = 'cuda'
     actor_grad_max = None
     critic_grad_max = None
@@ -43,36 +44,35 @@ class Config:
     nenvs = 10
     max_steps = 30
     n_evals = 1
-    buffer_capacity = 5 * 10**5
-
-    # logger
+    buffer_capacity = 2 * 10**5
 
     # autoencoder
     emb_dim = 50
-    encoder = 'MLP' #'PointNet'
+    encoder = 'MLP' #'PointNet', 'CNN'
     ae_l2 = 1e-7
     ae_lr = 1e-4
     ae_grad_max = None
     ae_latent_reg = 1e-7
 
-        # pointnet
-    pn_depth = 40
-    pn_number = 1000
+    # pointnet
+    pn_depth = 64
+    pn_number = 800
+    pn_layers = 4
 
-        # cnn
-    cnn_depth = 32
+    # cnn
+    cnn_depth = 64
     cnn_layers = 2
 
     #train
-    batch_size = 140
+    batch_size = 168
     steps_per_epoch = 10000
-    evaluation_steps = 10**4 #10**4
+    evaluation_steps = 10**4
     total_steps = 2*10**6
-    pretrain_steps = 10**5
+    pretrain_steps = 2*10**5
     actor_update_freq = 2           #
     critic_target_update_freq = 2   # not implemented yet
     decoder_update_freq = 2         #
-    save_freq = 2*10**4
+    save_freq = 4*10**4
     logdir = 'logdir'
 
     #task
@@ -90,7 +90,8 @@ class SAC:
         self._env = self._make_env()
 
         obs_shape, action_shape, enc_obs_shape = self._build()
-        self._task_path = pathlib.Path(self.c.logdir).joinpath(f'./{self.c.task}/{self.c.encoder}/')
+        self._task_path = pathlib.Path(self.c.logdir).joinpath(
+            f'./{self.c.task}/{self.c.encoder}/{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}')
         if not self.c.load:
             self._task_path.mkdir(parents=True)
         self.callback = SummaryWriter(log_dir=self._task_path)
@@ -119,7 +120,7 @@ class SAC:
         else:
             self._write_hparams()
             (self._task_path / 'buffer').mkdir()
-            self.runner.prefill(recalc(self.c.steps_per_epoch))
+            self.runner.prefill(recalc(min(self.c.pretrain_steps, self.c.buffer_capacity)))
 
         t = 0
         with trange(self.c.total_steps) as pbar:

@@ -1,8 +1,6 @@
 import torch
 from torchvision import transforms as T
 nn = torch.nn
-F = nn.functional
-from rltools.common.utils import build_mlp
 
 
 class Critic(nn.Module):
@@ -35,7 +33,7 @@ class DoubleCritic(nn.Module):
         return self.Q1(obs, action), self.Q2(obs, action)
 
 
-class PointCloudEncoder(nn.Module):
+class PointCloudEncoderOld(nn.Module):
     def __init__(self, in_features, depth):
         super().__init__()
 
@@ -65,7 +63,55 @@ class PointCloudEncoder(nn.Module):
         return X
 
 
+class PointCloudEncoder(nn.Module):
+    def __init__(self, in_features, depth, layers):
+        super().__init__()
+
+        self.convs = nn.ModuleList([nn.Conv1d(in_features, depth, 1)])
+        for _ in range(layers-1):
+            self.convs.append(nn.ReLU(inplace=True))
+            self.convs.append(nn.Conv1d(depth, depth, 1))
+
+        self.fc = nn.Sequential(
+            nn.ReLU(),
+            nn.Linear(depth, depth),
+            nn.LayerNorm(depth),
+            nn.Tanh()
+
+        )
+
+    def forward(self, x):
+        x = x.transpose(-1, -2)
+        for layer in self.convs:
+            x = layer(x)
+        x = torch.max(x, -1)[0]
+        return self.fc(x)
+
+
 class PointCloudDecoder(nn.Module):
+    def __init__(self, out_features, depth, layers, pn_number):
+        super().__init__()
+
+        self.fc = nn.Sequential(
+            nn.Linear(depth, depth * pn_number),
+            nn.ReLU(inplace=True),
+        )
+
+        self.deconvs = nn.ModuleList([nn.Unflatten(1, (depth, pn_number))])
+        for _ in range(layers-1):
+            self.deconvs.append(nn.ConvTranspose1d(depth, depth, 1))
+            self.deconvs.append(nn.ReLU(inplace=True))
+
+        self.deconvs.append(nn.ConvTranspose1d(depth, out_features, 1))
+
+    def forward(self, x):
+        x = self.fc(x)
+        for layer in self.deconvs:
+            x = layer(x)
+        return x.transpose(-1, -2)
+
+
+class PointCloudDecoderOld(nn.Module):
     def __init__(self, out_features, depth, n_points):
         super().__init__()
 
@@ -93,9 +139,8 @@ class PixelEncoder(nn.Module):
         super().__init__()
 
         self.depth = depth
-        mean, std = .5, 1
         self.convs = nn.ModuleList([
-            T.Normalize(in_channels*(mean,), in_channels*(std,)),
+            T.Normalize(.5, 1),
             nn.Conv2d(in_channels, depth, 3, stride=2)
         ])
         for _ in range(layers-1):

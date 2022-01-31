@@ -1,0 +1,4 @@
+*.ipynb*
+/logdir
+tasks
+/__pycache__
