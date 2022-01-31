@@ -142,6 +142,9 @@ class SACAgent(nn.Module):
             loss = chamfer_distance(obs, reconstruction)[0]
         elif self.c.encoder == 'MLP':
             loss = (obs - reconstruction).pow(2).mean()
+        elif self.c.encoder == 'CNN':
+            loss = (obs - reconstruction).pow(2).mean()
+
         return loss + self.c.ae_latent_reg * latent.pow(2).sum(-1).mean()
 
     def _alpha_loss(self, obs):

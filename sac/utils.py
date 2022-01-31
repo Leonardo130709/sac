@@ -1,5 +1,5 @@
 from torch import nn
-from .models import PointCloudDecoder, PointCloudEncoder
+from .models import PointCloudDecoder, PointCloudEncoder, PixelDecoder, PixelEncoder
 import torch
 import math
 import numpy as np
@@ -72,6 +72,11 @@ def build_encoder_decoder(configs, obs_shape):
         decoder.append(build_mlp([emb_dim] + 3*[configs.hidden] + [np.prod(obs_shape)]))
         decoder.append(nn.Unflatten(1, obs_shape))
         configs.encoder = 'PointNet'
+    elif configs.encoder == 'CNN':
+        enc = PixelEncoder(obs_shape[0], configs.cnn_depth, configs.cnn_layers)
+        _, _, width, height = enc.conv(torch.ones(1, *obs_shape)).shape
+        encoder.append(enc)
+        decoder.append(PixelDecoder(width, height, obs_shape[0], configs.cnn_depth, configs.cnn_layers))
     else:
         raise NotImplementedError
 

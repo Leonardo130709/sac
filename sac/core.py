@@ -9,7 +9,8 @@ from .utils import build_encoder_decoder
 from .runner import Runner
 from collections import deque
 from dm_control import suite
-from .wrappers import depthMapWrapper, FrameSkip, StackFrames, dmWrapper
+from dm_control.suite.wrappers import pixels
+from .wrappers import depthMapWrapper, FrameSkip, StackFrames, dmWrapper, PixelsToGym
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import trange
 import pathlib
@@ -54,8 +55,13 @@ class Config:
     ae_grad_max = None
     ae_latent_reg = 1e-7
 
+        # pointnet
     pn_depth = 40
     pn_number = 1000
+
+        # cnn
+    cnn_depth = 32
+    cnn_layers = 2
 
     #train
     batch_size = 140
@@ -159,12 +165,15 @@ class SAC:
             env = dmWrapper(env)
         elif self.c.encoder == 'PointNet':
             env = depthMapWrapper(env, device=self.c.device, points=self.c.pn_number)
+        elif self.c.encoder == 'CNN':
+            env = pixels.Wrapper(env, render_kwargs={'camera_id': 1, 'width': 84, 'height': 84})
+            env = PixelsToGym(env)
         else:
             raise NotImplementedError
         return StackFrames(FrameSkip(env, self.c.actions_repeat), self.c.frames_stack)
 
     def save(self):
-        self.buffer.save(self._task_path)
+        #self.buffer.save(self._task_path)
         torch.save({
             'interactions': self.runner.interactions_count,
             'model': self.agent.state_dict(),

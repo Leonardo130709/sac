@@ -1,4 +1,5 @@
 import torch
+from torchvision import transforms as T
 nn = torch.nn
 F = nn.functional
 from rltools.common.utils import build_mlp
@@ -85,3 +86,71 @@ class PointCloudDecoder(nn.Module):
         X = self.fc(X)
         X = self.deconv(X)
         return X.transpose(-1, -2)
+
+
+class PixelEncoder(nn.Module):
+    def __init__(self, in_channels=1, depth=32, layers=3):
+        super().__init__()
+
+        self.depth = depth
+        mean, std = .5, 1
+        self.convs = nn.ModuleList([
+            T.Normalize(in_channels*(mean,), in_channels*(std,)),
+            nn.Conv2d(in_channels, depth, 3, stride=2)
+        ])
+        for _ in range(layers-1):
+            self.convs.append(nn.ReLU(inplace=True))
+            self.convs.append(nn.Conv2d(depth, depth, 3, stride=1))
+
+        self.fc = None
+
+    def conv(self, img):
+        img = img / 255.
+        for conv in self.convs:
+            img = conv(img)
+        return img
+
+    def forward(self, img):
+        if self.fc is None:
+            self._build(img)
+        img = self.conv(img)
+        img = self.fc(img)
+        return img
+
+    def _build(self, img):
+        sample = self.conv(img)
+        _, _, w, h = sample.size()
+        self.fc = nn.Sequential(
+            nn.Flatten(),
+            nn.ReLU(),
+            nn.Linear(w*h*self.depth, self.depth),
+            nn.LayerNorm(self.depth),
+            nn.Tanh(),
+        )
+        return w, h
+
+
+class PixelDecoder(nn.Module):
+    def __init__(self, width, height, out_channels=3, depth=32, layers=2):
+        super().__init__()
+        # TODO find formulas instead of hardcoding dims
+        self.fc = nn.Sequential(
+            nn.Linear(depth, depth*width*height),
+            nn.ReLU(inplace=True),
+        )
+
+        self.deconvs = nn.ModuleList([nn.Unflatten(-1, (depth, width, height))])
+
+        for _ in range(layers-1):
+            self.deconvs.append(nn.ConvTranspose2d(depth, depth, 3, stride=1))
+            self.deconvs.append(nn.ReLU(inplace=True))
+
+        self.deconvs.append(nn.ConvTranspose2d(depth, out_channels, 3, stride=2, output_padding=1))
+        self.deconvs.append(T.Normalize(-0.5, 1.))
+
+    def forward(self, x):
+        x = self.fc(x)
+        for deconv in self.deconvs:
+            x = deconv(x)
+        x *= 255
+        return x

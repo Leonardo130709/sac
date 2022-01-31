@@ -4,10 +4,10 @@ from .wrappers.dm_control import Wrapper, dmWrapper
 from .core import SAC
 import torch
 import numpy as np
-nn = torch.nn
 from collections import deque
 import matplotlib.pyplot as plt
 from IPython.display import clear_output
+nn = torch.nn
 
 
 class PairedEnv(Wrapper):
@@ -39,7 +39,7 @@ class PCA:
         self.env = self._make_env()
         self.proj = self._build()
         self.proj.to(self.c.device)
-        self.opt = torch.optim.SGD(self.proj.parameters(), 1e-3)
+        self.opt = torch.optim.Adam(self.proj.parameters(), 1e-3)
 
     def _make_env(self):
         return PairedEnv(suite.load(*self.c.task.split('_', 1)))
@@ -75,7 +75,7 @@ class PCA:
         stats.append(np.inf)
         while np.mean(stats) > 1 or t < 100:
             t += 1
-            states, embed = self.sample_dataset(1000)
+            states, embed = self.sample_dataset(200)
             preds = self.proj(embed)
             loss = (preds-states).pow(2).mean()
             self.opt.zero_grad()
@@ -83,7 +83,7 @@ class PCA:
             self.opt.step()
             stats.append(loss.item())
             clear_output(wait=True)
-            for i in range(max(states.shape[-1], 5)):
+            for i in range(min(states.shape[-1], 5)):
                 plt.plot(states[:, i].detach().cpu(), label='states')
                 plt.plot(preds[:, i].detach().cpu(), label='recon')
                 plt.legend()
