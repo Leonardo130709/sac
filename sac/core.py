@@ -60,18 +60,15 @@ class Config:
     pn_layers = 4
 
     # cnn
-    cnn_depth = 64
-    cnn_layers = 2
+    cnn_depth = 32
+    cnn_layers = 4
 
     #train
-    batch_size = 168
-    steps_per_epoch = 10000
+    batch_size = 100
+    steps_per_epoch = 10**3
     evaluation_steps = 10**4
-    total_steps = 2*10**6
-    pretrain_steps = 2*10**5
-    actor_update_freq = 2           #
-    critic_target_update_freq = 2   # not implemented yet
-    decoder_update_freq = 2         #
+    total_steps = 10**6
+    pretrain_steps = 10**3
     save_freq = 4*10**4
     logdir = 'logdir'
 
@@ -161,13 +158,13 @@ class SAC:
         return obs_shape, action_shape, enc_obs_shape
 
     def _make_env(self):
-        env = suite.load(*self.c.task.split('_', 1), task_kwargs={'random': 0})
+        env = suite.load(*self.c.task.split('_', 1))  #, task_kwargs={'random': 0})
         if self.c.encoder == 'MLP':
             env = dmWrapper(env)
         elif self.c.encoder == 'PointNet':
             env = depthMapWrapper(env, device=self.c.device, points=self.c.pn_number)
         elif self.c.encoder == 'CNN':
-            env = pixels.Wrapper(env, render_kwargs={'camera_id': 1, 'width': 84, 'height': 84})
+            env = pixels.Wrapper(env, render_kwargs={'camera_id': 1, 'width': 64, 'height': 64})
             env = PixelsToGym(env)
         else:
             raise NotImplementedError

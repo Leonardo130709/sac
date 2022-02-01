@@ -66,7 +66,6 @@ class Runner:
     def __next__(self):
         tr = self.simulate()
         tr = self.transformations(tr)
-        # todo logger
         self._fill_buffer(tr)
         return tr
 
