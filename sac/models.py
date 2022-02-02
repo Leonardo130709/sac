@@ -73,7 +73,7 @@ class PointCloudEncoder(nn.Module):
             self.convs.append(nn.Conv1d(depth, depth, 1))
 
         self.fc = nn.Sequential(
-            nn.ReLU(),
+            #nn.ReLU(), # todo check if it is degrading performance
             nn.Linear(depth, depth),
             nn.LayerNorm(depth),
             nn.Tanh()

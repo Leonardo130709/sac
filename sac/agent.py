@@ -31,6 +31,7 @@ class SACAgent(nn.Module):
         self.target_critic = deepcopy(self.critic)
         self.alpha = nn.Parameter(torch.tensor(np.log(self.c.alpha)))
         self.target_entropy = np.prod(action_dim)
+        self.init_std = np.log(np.exp(5) - 1)
         self.compile()
 
         self.requires_grad_(False)
@@ -41,8 +42,8 @@ class SACAgent(nn.Module):
     def policy(self, obs):
         obs = self.encoder(obs)
         mu, std = self.actor(obs).chunk(2, -1)
-        std = torch.clamp(std, -5, 2)
-        std = F.softplus(std)
+        std = torch.clamp(std, -20, 2)
+        std = F.softplus(std + self.init_std)
         mu = self.c.mean_scale * torch.tanh(mu / self.c.mean_scale)
         dist = td.Normal(mu, std)
         dist = td.TransformedDistribution(dist, TanhTransform())
@@ -57,7 +58,7 @@ class SACAgent(nn.Module):
         if training:
             action = dist.sample()
         else:
-            action = torch.mean(dist.sample(sample_shape=[1000]), 0)  # only works for normal
+            action = torch.mean(dist.sample(sample_shape=[1000]), 0)
         return action
 
     @torch.no_grad()
@@ -160,6 +161,6 @@ class SACAgent(nn.Module):
         self.ae_params = list(self.encoder.parameters()) + list(self.decoder.parameters())
         self.autoencoder_optim = torch.optim.Adam(self.ae_params,
                                                   self.c.ae_lr, weight_decay=self.c.ae_l2)
-        self.alpha_optim = torch.optim.Adam([self.alpha], self.c.alpha_lr)
+        self.alpha_optim = torch.optim.Adam([self.alpha], self.c.alpha_lr, betas=(0.5, .999))
         self.to(self.c.device)
         self.apply(weight_init)

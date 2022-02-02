@@ -48,6 +48,12 @@ class Wrapper:
             return self._env.unwrapped
         return self._env
 
+    def __getattr__(self, item):
+        return getattr(self._env, item)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}"
+
 
 class PixelsToGym(Wrapper):
     def __init__(self, env):

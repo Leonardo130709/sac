@@ -1,5 +1,6 @@
 import numpy as np
 from gym import Wrapper
+from gym.spaces import Box
 from collections import deque
 
 
@@ -26,17 +27,26 @@ class StackFrames(Wrapper):
         self._n = nframes
         self._deq = deque(maxlen=nframes)
         self._env = env
-        self.action_space, self.observation_space = self._env.action_space, self._env.observation_space
+
+        self.observation_space = self._env.observation_space
+        self.action_space = self._env.action_space
+        low = np.repeat(self.observation_space.low[np.newaxis, ...], nframes, axis=0)
+        high = np.repeat(
+            self.observation_space.high[np.newaxis, ...], nframes, axis=0
+        )
+        self.observation_space = Box(
+            low=low, high=high, dtype=self.observation_space.dtype
+        )
 
     def step(self, action):
         new_obs, reward, done, info = self._env.step(action)
         self._deq.append(new_obs)
-        return self.observation(), np.float32(reward), done, info
+        return self.observation(None), np.float32(reward), done, info
 
     def reset(self):
         obs = self._env.reset()
         [self._deq.append(obs) for _ in range(self._n)]
-        return self.observation()
+        return self.observation(None)
 
-    def observation(self):
+    def observation(self, observation):
         return np.concatenate(self._deq)
