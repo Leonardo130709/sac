@@ -44,7 +44,7 @@ class Config:
     nenvs = 10
     max_steps = 30
     n_evals = 1
-    buffer_capacity = 2 * 10**5
+    buffer_capacity = 5 * 10**5
 
     # autoencoder
     emb_dim = 50
@@ -56,8 +56,8 @@ class Config:
 
     # pointnet
     pn_depth = 120
-    pn_number = 400
-    pn_layers = 5
+    pn_number = 800
+    pn_layers = 4
 
     # cnn
     cnn_depth = 32

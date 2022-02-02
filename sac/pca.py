@@ -55,7 +55,7 @@ class PCA:
     def __init__(self, postfix):
         self.env, self.c, self.encoder = self.load(postfix)
         self.proj = self._build()
-        self.opt = torch.optim.Adam(self.proj.parameters(), 1e-3)
+        self.opt = torch.optim.Adam(self.proj.parameters(), 1e-2)
 
     def _build(self):
         state, embed = self.sample_dataset(1)
