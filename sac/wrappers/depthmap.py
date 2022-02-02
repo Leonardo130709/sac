@@ -39,7 +39,7 @@ class depthMapWrapper(Wrapper):
         return pc.detach().cpu().numpy()
 
     def _segmentation(self, pc):
-        dist_thresh = 10
+        dist_thresh = 19
         #TODO find a way
         pc = pc[pc[..., 2] < dist_thresh] # smth like infty cutting
         if self.points:

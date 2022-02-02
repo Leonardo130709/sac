@@ -8,6 +8,7 @@ try:
     import plotly.graph_objects as go
 except ImportError:
     pass
+from dm_control import suite
 td = torch.distributions
 
 
@@ -173,3 +174,11 @@ class TanhTransform(td.transforms.TanhTransform):
     def _inverse(self, y):
         y = torch.clamp(y, min=-self.lim, max=self.lim)
         return torch.atanh(y)
+
+
+def make_env(name, **kwargs):
+    domain, task = name.split('_', 1)
+    if domain == 'ball':
+        domain = 'ball_in_cup'
+        task = 'catch'
+    return suite.load(domain, task, **kwargs)

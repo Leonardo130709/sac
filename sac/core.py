@@ -5,10 +5,9 @@ from .buffer import ReplayBuffer
 from torch.utils.data import DataLoader
 import numpy as np
 from .transformations import Transformations, Next, Transpose, Truncate
-from .utils import build_encoder_decoder
+from .utils import build_encoder_decoder, make_env
 from .runner import Runner
 from collections import deque
-from dm_control import suite
 from dm_control.suite.wrappers import pixels
 from .wrappers import depthMapWrapper, FrameSkip, StackFrames, dmWrapper, PixelsToGym
 from torch.utils.tensorboard import SummaryWriter
@@ -16,6 +15,7 @@ from tqdm import trange
 import pathlib
 from ruamel.yaml import YAML
 import datetime
+import gc
 nn = torch.nn
 td = torch.distributions
 #torch.autograd.set_detect_anomaly(True)
@@ -25,7 +25,7 @@ td = torch.distributions
 class Config:
     # agent
     alpha = .1
-    hidden = 512
+    hidden = 1024
     mean_scale = 5
     rho_critic = .99
     rho_encoder = .95
@@ -44,7 +44,7 @@ class Config:
     nenvs = 10
     max_steps = 30
     n_evals = 1
-    buffer_capacity = 2 * 10**5
+    buffer_capacity = 5 * 10**5
 
     # autoencoder
     emb_dim = 50
@@ -55,23 +55,20 @@ class Config:
     ae_latent_reg = 1e-7
 
     # pointnet
-    pn_depth = 64
+    pn_depth = 120
     pn_number = 800
     pn_layers = 4
 
     # cnn
-    cnn_depth = 64
-    cnn_layers = 2
+    cnn_depth = 32
+    cnn_layers = 4
 
     #train
-    batch_size = 168
-    steps_per_epoch = 10000
+    batch_size = 128
+    steps_per_epoch = 10**3
     evaluation_steps = 10**4
-    total_steps = 2*10**6
-    pretrain_steps = 2*10**5
-    actor_update_freq = 2           #
-    critic_target_update_freq = 2   # not implemented yet
-    decoder_update_freq = 2         #
+    total_steps = 10**6
+    pretrain_steps = 10**3
     save_freq = 4*10**4
     logdir = 'logdir'
 
@@ -87,7 +84,7 @@ config = Config()
 class SAC:
     def __init__(self, config=Config()):
         self.c = config
-        self._env = self._make_env()
+        self._env = self.make_env()
 
         obs_shape, action_shape, enc_obs_shape = self._build()
         self._task_path = pathlib.Path(self.c.logdir).joinpath(
@@ -103,7 +100,7 @@ class SAC:
             return self.agent.act(obs, training).detach().cpu().numpy()
 
         self.buffer = ReplayBuffer(obs_shape, action_shape, self.c.buffer_capacity)
-        self.runner = Runner(self._make_env, policy, self.buffer, self.c,
+        self.runner = Runner(self.make_env, policy, self.buffer, self.c,
                              transformations=Transformations(Next(['observations'], axis=0), Truncate(amount=1, axis=0),
                                                              Transpose(0, 1)))
 
@@ -148,6 +145,7 @@ class SAC:
 
                 if t % save_freq == 0:
                     self.save()
+                gc.collect()
 
     def _build(self):
         action_shape = self._env.action_space.shape[0]
@@ -160,14 +158,14 @@ class SAC:
             enc_obs_shape = sample.shape[1]
         return obs_shape, action_shape, enc_obs_shape
 
-    def _make_env(self):
-        env = suite.load(*self.c.task.split('_', 1), task_kwargs={'random': 0})
+    def make_env(self):
+        env = make_env(self.c.task)#, task_kwargs={'random': 1})
         if self.c.encoder == 'MLP':
             env = dmWrapper(env)
         elif self.c.encoder == 'PointNet':
             env = depthMapWrapper(env, device=self.c.device, points=self.c.pn_number)
         elif self.c.encoder == 'CNN':
-            env = pixels.Wrapper(env, render_kwargs={'camera_id': 1, 'width': 84, 'height': 84})
+            env = pixels.Wrapper(env, render_kwargs={'camera_id': 1, 'width': 64, 'height': 64})
             env = PixelsToGym(env)
         else:
             raise NotImplementedError
@@ -187,9 +185,14 @@ class SAC:
     def load(self):
         y = YAML(typ='unsafe')
         y.register_class(Config)
+
         with (self._task_path / 'hyperparams').open() as hp:
-            self.c = y.load(hp)
+            conf_dict = y.load(hp)
+        for k, v in conf_dict.items():
+            setattr(self.c, k, v)
+
         #self.buffer.load(self._task_path)
+
         chkp = torch.load(self._task_path / 'checkpoint')
         with torch.no_grad():
             self.agent.load_state_dict(chkp['model'])
@@ -204,8 +207,13 @@ class SAC:
     def _write_hparams(self):
         y = YAML(typ='unsafe')
         y.register_class(Config)
+        conf_dict = {}
+        for key in dir(self.c):
+            if not key.startswith('_'):
+                conf_dict[key] = getattr(self.c, key)
         with (self._task_path / 'hyperparams').open('w') as hp:
-            y.dump(self.c, hp)
+            y.dump(conf_dict, hp)
+
 
 
 
