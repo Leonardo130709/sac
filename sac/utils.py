@@ -4,7 +4,10 @@ import torch
 import math
 import numpy as np
 from gym.spaces import Box, Discrete
-import plotly.graph_objects as go
+try:
+    import plotly.graph_objects as go
+except ImportError:
+    pass
 td = torch.distributions
 
 

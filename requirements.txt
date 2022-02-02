@@ -1,9 +1,7 @@
 numpy
 gym
-torch
-pytorch3d
-torchvision
-PIL
-ruamel.yaml
 tqdm
+dm_control
+pytorch3d
 matplotlib
+tensorboard
