@@ -28,7 +28,7 @@ class Wrapper:
         return obs, r, d, None
 
     def reset(self):
-        return np.float32(self.observation(self._env.reset()))
+        return self.observation(self._env.reset())
 
     @staticmethod
     def _infer_spaces(env):

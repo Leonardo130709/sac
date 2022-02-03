@@ -31,7 +31,7 @@ class SACAgent(nn.Module):
         self.target_critic = deepcopy(self.critic)
         self.alpha = nn.Parameter(torch.tensor(np.log(self.c.alpha)))
         self.target_entropy = np.prod(action_dim)
-        self.init_std = np.log(np.exp(5) - 1)
+        self.init_std = np.log(np.exp(2) - 1)
         self.compile()
 
         self.requires_grad_(False)
@@ -133,6 +133,7 @@ class SACAgent(nn.Module):
             target_values = rewards + self.c.gamma * (1 - dones) * target_values
 
         v1, v2 = self.critic(obs, actions)
+        assert v1.shape == tv1.shape
         return (v1 - target_values).pow(2).mean() + (v2 - target_values).pow(2).mean()
 
     def _ae_loss(self, obs):
